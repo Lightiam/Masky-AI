@@ -29,6 +29,7 @@
             const [suggestions, setSuggestions] = useState([]);
             const [history, setHistory] = useState([]);
             const [showSettings, setShowSettings] = useState(false);
+            const [mode, setMode] = useState('coach'); // 'coach' or 'answer'
             const [settings, setSettings] = useState({ autoListen: true, responseDelay: 2000 });
             const recognitionRef = useRef(null);
             const timeoutRef = useRef(null);
@@ -52,8 +53,15 @@
                         if (final) {
                             clearTimeout(timeoutRef.current);
                             timeoutRef.current = setTimeout(() => {
-                                const responses = getSmartResponses(final.trim());
-                                setHistory(prev => [...prev, { question: final.trim(), timestamp: new Date().toLocaleTimeString(), suggestions: responses }]);
+                                const responses = mode === 'coach' 
+                                    ? getCoachingTips(final.trim())
+                                    : getDirectAnswer(final.trim());
+                                setHistory(prev => [...prev, { 
+                                    question: final.trim(), 
+                                    timestamp: new Date().toLocaleTimeString(), 
+                                    suggestions: responses,
+                                    mode: mode
+                                }]);
                                 setSuggestions(responses);
                                 setTranscript('');
                             }, settings.responseDelay);
@@ -70,7 +78,7 @@
                     if (recognitionRef.current) recognitionRef.current.stop();
                     clearTimeout(timeoutRef.current);
                 };
-            }, [isListening, settings]);
+            }, [isListening, settings, mode]);
 
             const toggleListening = () => {
                 if (!recognitionRef.current) {
@@ -92,7 +100,43 @@
                 }
             };
 
-            const getSmartResponses = (q) => {
+            const getDirectAnswer = (question) => {
+                const lq = question.toLowerCase();
+                
+                // Knowledge base with direct answers
+                const knowledgeBase = {
+                    'what is cybersecurity': {
+                        answer: 'Cybersecurity is the practice of protecting systems, networks, and programs from digital attacks. These attacks aim to access, change, or destroy sensitive information, extort money, or interrupt normal business processes. Key areas include network security, application security, information security, operational security, disaster recovery, and end-user education.'
+                    },
+                    'what is ai': {
+                        answer: 'Artificial Intelligence (AI) is the simulation of human intelligence by machines, especially computer systems. AI systems can perform tasks like learning, reasoning, problem-solving, perception, and language understanding. Common applications include machine learning, natural language processing, computer vision, and robotics.'
+                    },
+                    'what is machine learning': {
+                        answer: 'Machine Learning is a subset of AI that enables systems to learn and improve from experience without being explicitly programmed. It uses algorithms to analyze data, identify patterns, and make decisions. Types include supervised learning, unsupervised learning, and reinforcement learning.'
+                    },
+                    'what is cloud computing': {
+                        answer: 'Cloud computing is the delivery of computing services (servers, storage, databases, networking, software) over the internet. Major providers include AWS, Azure, and Google Cloud. Benefits include cost savings, scalability, flexibility, and reduced IT infrastructure management.'
+                    }
+                };
+
+                // Search for matching topic
+                for (const [key, value] of Object.entries(knowledgeBase)) {
+                    if (lq.includes(key) || key.includes(lq.replace('what is ', ''))) {
+                        return [
+                            { type: 'answer', content: value.answer },
+                            { type: 'tip', content: 'When answering this in an interview, explain it clearly, give real-world examples, and relate it to the role you\'re applying for.' }
+                        ];
+                    }
+                }
+
+                // If not in knowledge base, provide general guidance
+                return [
+                    { type: 'info', content: `I don't have a direct answer for "${question}" in my knowledge base yet. In an interview, you would explain this concept clearly with examples.` },
+                    { type: 'tip', content: 'Structure your answer: Define the concept → Explain key components → Give real-world examples → Connect to your experience or the role.' }
+                ];
+            };
+
+            const getCoachingTips = (q) => {
                 const lq = q.toLowerCase();
                 if (lq.includes('tell me about yourself') || lq.includes('introduce yourself')) {
                     return [
@@ -110,24 +154,6 @@
                     return [
                         { type: 'framework', content: 'Pick 2-3 relevant strengths, provide specific examples with metrics, connect to role requirements.' },
                         { type: 'tip', content: 'Use STAR method: Situation, Task, Action, Result. Be specific with numbers.' }
-                    ];
-                }
-                if (lq.includes('why') && (lq.includes('company') || lq.includes('here'))) {
-                    return [
-                        { type: 'framework', content: 'Mention specific company initiatives, culture, or recent news. Connect to career goals.' },
-                        { type: 'tip', content: 'Reference specific projects or values. Show you\'ve done homework.' }
-                    ];
-                }
-                if (lq.includes('conflict') || lq.includes('disagreement') || lq.includes('difficult')) {
-                    return [
-                        { type: 'framework', content: 'STAR method: Describe objectively, explain resolution approach, focus on positive outcome.' },
-                        { type: 'tip', content: 'Emphasize communication, empathy, problem-solving. Show emotional intelligence.' }
-                    ];
-                }
-                if (lq.includes('where do you see yourself') || lq.includes('5 years')) {
-                    return [
-                        { type: 'framework', content: 'Focus on skill development and increasing responsibility. Align with company trajectory.' },
-                        { type: 'example', content: 'I see myself deepening expertise in [area], taking on leadership, contributing to [goal].' }
                     ];
                 }
                 return [
@@ -155,11 +181,37 @@
                                 <div>
                                     <div className="flex items-center gap-3 mb-2">
                                         <div className="gradient-bg p-2 rounded-lg text-white text-2xl">🎭</div>
-                                        <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                                            Masky AI
-                                        </h1>
+                                        <div>
+                                            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                                                Masky AI
+                                            </h1>
+                                            <div className="flex gap-2 mt-1">
+                                                <button
+                                                    onClick={() => setMode('coach')}
+                                                    className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                                                        mode === 'coach' 
+                                                            ? 'bg-indigo-600 text-white' 
+                                                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                                                    }`}>
+                                                    🎓 Coach Mode
+                                                </button>
+                                                <button
+                                                    onClick={() => setMode('answer')}
+                                                    className={`text-xs px-3 py-1 rounded-full transition-colors ${
+                                                        mode === 'answer' 
+                                                            ? 'bg-purple-600 text-white' 
+                                                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                                                    }`}>
+                                                    💡 Answer Mode
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p className="text-gray-600">AI-powered interview practice companion</p>
+                                    <p className="text-gray-600">
+                                        {mode === 'coach' 
+                                            ? 'Get coaching tips on how to answer interview questions' 
+                                            : 'Get direct answers to technical questions'}
+                                    </p>
                                 </div>
                                 <button onClick={() => setShowSettings(!showSettings)} className="p-3 hover:bg-gray-100 rounded-lg transition-colors text-xl">
                                     ⚙️
@@ -187,7 +239,9 @@
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <div className="space-y-6">
                                 <div className="bg-white rounded-xl shadow-xl p-6">
-                                    <h2 className="text-xl font-semibold mb-4">Live Transcription</h2>
+                                    <h2 className="text-xl font-semibold mb-4">
+                                        {mode === 'coach' ? 'Ask Interview Question' : 'Ask Technical Question'}
+                                    </h2>
                                     <div className="flex justify-center mb-6">
                                         <button onClick={toggleListening}
                                             className={`p-8 rounded-full transition-all transform hover:scale-105 shadow-2xl text-white ${
@@ -206,20 +260,35 @@
                                     </div>
                                     <div className="bg-gray-50 rounded-lg p-4 min-h-32 border">
                                         <p className="text-gray-700 text-lg">
-                                            {transcript || (isListening ? 'Waiting for speech...' : 'Click microphone to begin')}
+                                            {transcript || (isListening ? 'Waiting for speech...' : 
+                                                mode === 'coach' 
+                                                    ? 'Ask: "Tell me about yourself" or other interview questions'
+                                                    : 'Ask: "What is cybersecurity?" or other technical questions'
+                                            )}
                                         </p>
+                                    </div>
+                                    <div className="mt-4 text-xs text-gray-500 bg-blue-50 p-3 rounded">
+                                        <strong>Current Mode:</strong> {mode === 'coach' ? '🎓 Coach' : '💡 Answer'} 
+                                        {mode === 'answer' && ' (Limited knowledge base - add backend for full AI)'}
                                     </div>
                                 </div>
 
                                 {suggestions.length > 0 && (
                                     <div className="bg-white rounded-xl shadow-xl p-6 slide-in">
                                         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                            <span className="text-2xl">💡</span> Smart Suggestions
+                                            <span className="text-2xl">{mode === 'coach' ? '💡' : '📚'}</span> 
+                                            {mode === 'coach' ? 'Coaching Tips' : 'Answer'}
                                         </h2>
                                         <div className="space-y-3">
                                             {suggestions.map((s, i) => (
-                                                <div key={i} className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200">
-                                                    <span className="inline-block px-2 py-1 bg-indigo-600 text-white text-xs font-bold rounded uppercase mb-2">
+                                                <div key={i} className={`p-4 rounded-lg border ${
+                                                    s.type === 'answer' 
+                                                        ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200'
+                                                        : 'bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200'
+                                                }`}>
+                                                    <span className={`inline-block px-2 py-1 text-white text-xs font-bold rounded uppercase mb-2 ${
+                                                        s.type === 'answer' ? 'bg-purple-600' : 'bg-indigo-600'
+                                                    }`}>
                                                         {s.type}
                                                     </span>
                                                     <p className="text-gray-700 leading-relaxed">{s.content}</p>
@@ -232,13 +301,13 @@
 
                             <div className="bg-white rounded-xl shadow-xl p-6">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-xl font-semibold">Conversation History</h2>
+                                    <h2 className="text-xl font-semibold">History</h2>
                                     {history.length > 0 && (
                                         <div className="flex gap-2">
-                                            <button onClick={exportHistory} className="px-3 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm transition-colors flex items-center gap-1">
+                                            <button onClick={exportHistory} className="px-3 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm transition-colors">
                                                 📥 Export
                                             </button>
-                                            <button onClick={() => setHistory([])} className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm transition-colors flex items-center gap-1">
+                                            <button onClick={() => setHistory([])} className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm transition-colors">
                                                 🗑️ Clear
                                             </button>
                                         </div>
@@ -248,18 +317,27 @@
                                     {history.length === 0 ? (
                                         <div className="text-center py-12 text-gray-400">
                                             <div className="text-5xl mb-3">💬</div>
-                                            <p>Start listening to see your interview history</p>
+                                            <p>Start asking questions to see history</p>
                                         </div>
                                     ) : (
                                         history.map((entry, idx) => (
                                             <div key={idx} className="border rounded-lg p-4 hover:shadow-md transition-shadow slide-in">
-                                                <span className="text-xs text-gray-500">{entry.timestamp}</span>
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="text-xs text-gray-500">{entry.timestamp}</span>
+                                                    <span className={`text-xs px-2 py-1 rounded ${
+                                                        entry.mode === 'coach' ? 'bg-indigo-100 text-indigo-700' : 'bg-purple-100 text-purple-700'
+                                                    }`}>
+                                                        {entry.mode === 'coach' ? '🎓 Coach' : '💡 Answer'}
+                                                    </span>
+                                                </div>
                                                 <div className="mt-2 mb-3">
                                                     <p className="font-medium text-gray-800 mb-1">Question:</p>
                                                     <p className="text-gray-700 bg-gray-50 p-2 rounded">{entry.question}</p>
                                                 </div>
                                                 <div>
-                                                    <p className="font-medium text-gray-800 mb-2 text-sm">Suggestions:</p>
+                                                    <p className="font-medium text-gray-800 mb-2 text-sm">
+                                                        {entry.mode === 'coach' ? 'Coaching Tips:' : 'Answer:'}
+                                                    </p>
                                                     <div className="space-y-2">
                                                         {entry.suggestions.map((sugg, sidx) => (
                                                             <div key={sidx} className="text-sm bg-indigo-50 p-2 rounded border-l-2 border-indigo-400">
@@ -278,7 +356,9 @@
 
                         <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                             <p className="text-sm text-yellow-800">
-                                <strong>Ethical Use Notice:</strong> This tool is designed for interview preparation and practice. Using AI assistance during actual interviews without disclosure may violate policies and ethical guidelines.
+                                <strong>Note:</strong> {mode === 'coach' 
+                                    ? 'Coach mode helps you learn HOW to answer interview questions using proven frameworks.' 
+                                    : 'Answer mode has a limited built-in knowledge base. For unlimited AI-powered answers, deploy the backend with GPT-4.'}
                             </p>
                         </div>
 
